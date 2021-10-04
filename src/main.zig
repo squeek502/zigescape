@@ -71,7 +71,7 @@ pub fn main() anyerror!void {
         }
         var line_allocated = false;
         // wrap in quotes if it's not already
-        if (line.len >= 2 and (line[0] != '"' or line[line.len - 1] != '"')) {
+        if (line.len < 2 or line[0] != '"' or line[line.len - 1] != '"') {
             var buf = try allocator.alloc(u8, line.len + 2);
             buf[0] = '"';
             std.mem.copy(u8, buf[1..], line);
