@@ -4,7 +4,7 @@ const clap = @import("clap");
 pub fn main() anyerror!void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer std.debug.assert(gpa.deinit() == false);
-    const allocator = &gpa.allocator;
+    const allocator = gpa.allocator();
 
     const params = comptime [_]clap.Param(clap.Help){
         clap.parseParam("-h, --help            Display this help and exit.") catch unreachable,
