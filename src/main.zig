@@ -22,8 +22,6 @@ pub fn main() anyerror!void {
 
     if (args.flag("--help")) {
         const writer = std.io.getStdErr().writer();
-        //try writer.writeAll("Usage: grindcov [options] -- <cmd> [<args>...]\n\n");
-        //try writer.writeAll("Available options:\n");
         try writer.writeAll("Usage: zigescape ");
         try clap.usage(writer, &params);
         try writer.writeAll("\n\n");
