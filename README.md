@@ -3,6 +3,8 @@ zigescape
 
 A tool for converting between binary data and [Zig](https://ziglang.org/) string literals.
 
+The original motivation for this was to be able to easily turn inputs found via fuzz testing into strings that can be used in Zig test cases ([like in the tests added by this commit](https://github.com/ziglang/zig/pull/9880/commits/36f1f4f9fe39492367445b60153d7217533fb379)).
+
 Basic example (more can be found below):
 
 ```sh
