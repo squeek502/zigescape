@@ -32,10 +32,13 @@ Usage: zigescape [-hs] [-o <PATH>] <INPUT>
          If <INPUT> is not specified, then stdin is used.
 
 Available options:
-	-h, --help         	Display this help and exit.
-	-o, --output <PATH>	Output file path (stdout is used if not specified).
-	-s, --string       	Specifies that the input is a Zig string literal.
-	                   	Output will be the parsed string.
+
+-h, --help             Display this help and exit.
+
+-o, --output <PATH>    Output file path (stdout is used if not specified).
+
+-s, --string           Specifies that the input is a Zig string literal.
+                       Output will be the parsed string.
 ```
 
 ## Examples

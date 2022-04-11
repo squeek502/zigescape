@@ -12,31 +12,41 @@ pub fn main() anyerror!void {
         clap.parseParam("-s, --string          Specifies that the input is a Zig string literal.\nOutput will be the parsed string.") catch unreachable,
         clap.parseParam("<INPUT>               ") catch unreachable,
     };
+    const parsers = comptime .{
+        .PATH = clap.parsers.string,
+        .INPUT = clap.parsers.string,
+    };
 
     var diag = clap.Diagnostic{};
-    var args = clap.parse(clap.Help, &params, .{ .diagnostic = &diag, .allocator = allocator }) catch |err| {
+    var argres = clap.parse(clap.Help, &params, parsers, .{ .diagnostic = &diag, .allocator = allocator }) catch |err| {
         diag.report(std.io.getStdErr().writer(), err) catch {};
         return err;
     };
-    defer args.deinit();
+    defer argres.deinit();
 
-    if (args.flag("--help")) {
+    if (argres.args.help) {
         const writer = std.io.getStdErr().writer();
         try writer.writeAll("Usage: zigescape ");
-        try clap.usage(writer, &params);
+        try clap.usage(writer, clap.Help, &params);
         try writer.writeAll("\n\n");
         try writer.writeAll(
             \\<INPUT>: Either a path to a file or a Zig string literal (if using --string)
             \\         If <INPUT> is not specified, then stdin is used.
         );
         try writer.writeAll("\n\n");
-        try writer.writeAll("Available options:\n");
-        try clap.help(writer, &params);
+        try writer.writeAll("Available options:\n\n");
+        try clap.help(writer, clap.Help, &params, .{
+            .markdown_lite = false,
+            .description_on_new_line = false,
+            .description_indent = 4,
+            .indent = 0,
+            .spacing_between_parameters = 1,
+        });
         return;
     }
 
     const outfile = outfile: {
-        if (args.option("--output")) |output_path| {
+        if (argres.args.output) |output_path| {
             break :outfile try std.fs.cwd().createFile(output_path, .{});
         } else {
             break :outfile std.io.getStdOut();
@@ -46,12 +56,12 @@ pub fn main() anyerror!void {
 
     var data_allocated = false;
     const data = data: {
-        if (args.flag("--string") and args.positionals().len > 0) {
-            break :data args.positionals()[0];
+        if (argres.args.string and argres.positionals.len > 0) {
+            break :data argres.positionals[0];
         }
         const infile = infile: {
-            if (args.positionals().len > 0) {
-                const path = args.positionals()[0];
+            if (argres.positionals.len > 0) {
+                const path = argres.positionals[0];
                 break :infile try std.fs.cwd().openFile(path, .{});
             } else {
                 break :infile std.io.getStdIn();
@@ -62,7 +72,7 @@ pub fn main() anyerror!void {
     };
     defer if (data_allocated) allocator.free(data);
 
-    if (args.flag("--string")) {
+    if (argres.args.string) {
         var line = data;
         if (std.mem.indexOfAny(u8, line, "\r\n")) |line_end| {
             line = line[0..line_end];
