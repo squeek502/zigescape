@@ -10,6 +10,7 @@ pub fn main() anyerror!void {
         clap.parseParam("-h, --help            Display this help and exit.") catch unreachable,
         clap.parseParam("-o, --output <PATH>   Output file path (stdout is used if not specified).") catch unreachable,
         clap.parseParam("-s, --string          Specifies that the input is a Zig string literal.\nOutput will be the parsed string.") catch unreachable,
+        clap.parseParam("-x, --hex             Specifies that the input is a series of hex bytes\nin string format (e.g. \"0A B4 10\").\nOutput will be a Zig string literal.") catch unreachable,
         clap.parseParam("<INPUT>               ") catch unreachable,
     };
     const parsers = comptime .{
@@ -30,7 +31,8 @@ pub fn main() anyerror!void {
         try clap.usage(writer, clap.Help, &params);
         try writer.writeAll("\n\n");
         try writer.writeAll(
-            \\<INPUT>: Either a path to a file or a Zig string literal (if using --string)
+            \\<INPUT>: Either a path to a file, or a Zig string literal (if using --string),
+            \\         or a series of hex bytes in string format (if using --hex).
             \\         If <INPUT> is not specified, then stdin is used.
         );
         try writer.writeAll("\n\n");
@@ -56,7 +58,7 @@ pub fn main() anyerror!void {
 
     var data_allocated = false;
     const data = data: {
-        if (argres.args.string and argres.positionals.len > 0) {
+        if ((argres.args.string or argres.args.hex) and argres.positionals.len > 0) {
             break :data argres.positionals[0];
         }
         const infile = infile: {
@@ -95,6 +97,103 @@ pub fn main() anyerror!void {
 
         try writer.writeAll(parsed);
     } else {
-        try writer.print("\"{}\"\n", .{std.zig.fmtEscapes(data)});
+        var to_escape = data;
+        if (argres.args.hex) {
+            var buf = std.ArrayList(u8).init(allocator);
+            errdefer buf.deinit();
+            var err_loc: ErrorLoc = undefined;
+            parseHexToData(buf.writer(), data, &err_loc) catch |err| switch (err) {
+                error.UnfinishedHexByte, error.UnexpectedChar => {
+                    std.debug.print("{} at offset {}: '{s}'\n", .{ err, err_loc.start_index, std.fmt.fmtSliceEscapeUpper(err_loc.slice(data)) });
+                    std.os.exit(1);
+                },
+                else => |e| return e,
+            };
+            to_escape = try buf.toOwnedSlice();
+        }
+        defer if (argres.args.hex) allocator.free(to_escape);
+        try writer.print("\"{}\"\n", .{std.zig.fmtEscapes(to_escape)});
     }
+}
+
+const ErrorLoc = struct {
+    start_index: usize,
+    end_index: usize,
+
+    pub fn slice(self: ErrorLoc, data: []const u8) []const u8 {
+        return data[self.start_index..self.end_index];
+    }
+};
+
+fn parseHexToData(writer: anytype, hex_string: []const u8, err_loc: *ErrorLoc) !void {
+    var byte: u8 = 0;
+    var i: usize = 0;
+    var hex_len: u2 = 0;
+    while (i < hex_string.len) : (i += 1) {
+        const c = hex_string[i];
+        switch (c) {
+            '0'...'9', 'a'...'f', 'A'...'F' => {
+                if (byte != 0) byte *= 16;
+                byte += std.fmt.charToDigit(c, 16) catch unreachable;
+                hex_len += 1;
+                if (hex_len == 2) {
+                    hex_len = 0;
+                    try writer.writeByte(byte);
+                    byte = 0;
+                }
+            },
+            ' ', '\t', '\r', '\n' => {
+                if (hex_len != 0) {
+                    err_loc.* = .{ .start_index = i - hex_len, .end_index = i };
+                    return error.UnfinishedHexByte;
+                }
+            },
+            else => {
+                err_loc.* = .{ .start_index = i, .end_index = i + 1 };
+                return error.UnexpectedChar;
+            },
+        }
+    }
+    if (hex_len != 0) {
+        err_loc.* = .{ .start_index = i - hex_len, .end_index = i };
+        return error.UnfinishedHexByte;
+    }
+}
+
+test "parseHexToData" {
+    var buf = std.ArrayList(u8).init(std.testing.allocator);
+    defer buf.deinit();
+
+    var err_loc: ErrorLoc = undefined;
+    try parseHexToData(
+        buf.writer(),
+        "2f2f2120e29494e2 94 80 E2 94\t80 \t \t e2 94 00",
+        &err_loc,
+    );
+    var base64_buf: [256]u8 = undefined;
+    const base64_data = std.base64.standard.Encoder.encode(&base64_buf, buf.items);
+
+    try std.testing.expectEqualSlices(
+        u8,
+        "Ly8hIOKUlOKUgOKUgOKUAA==",
+        base64_data,
+    );
+
+    buf.clearRetainingCapacity();
+    try std.testing.expectError(error.UnfinishedHexByte, parseHexToData(buf.writer(), "153 43 82", &err_loc));
+    try std.testing.expectEqual(@as(usize, 2), err_loc.start_index);
+    try std.testing.expectEqual(@as(usize, 3), err_loc.end_index);
+    try std.testing.expectEqualSlices(u8, "3", err_loc.slice("153 43 82"));
+
+    buf.clearRetainingCapacity();
+    try std.testing.expectError(error.UnfinishedHexByte, parseHexToData(buf.writer(), "15 43 8", &err_loc));
+    try std.testing.expectEqual(@as(usize, 6), err_loc.start_index);
+    try std.testing.expectEqual(@as(usize, 7), err_loc.end_index);
+    try std.testing.expectEqualSlices(u8, "8", err_loc.slice("15 43 8"));
+
+    buf.clearRetainingCapacity();
+    try std.testing.expectError(error.UnexpectedChar, parseHexToData(buf.writer(), "15 4Z 5c", &err_loc));
+    try std.testing.expectEqual(@as(usize, 4), err_loc.start_index);
+    try std.testing.expectEqual(@as(usize, 5), err_loc.end_index);
+    try std.testing.expectEqualSlices(u8, "Z", err_loc.slice("15 4Z 5c"));
 }

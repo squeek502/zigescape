@@ -12,6 +12,13 @@ $ echo '00 01 02 03 04' | xxd -r -p | zigescape
 "\x00\x01\x02\x03\x04"
 ```
 
+or with the `--hex` option, this can be done directly:
+
+```sh
+$ zigescape --hex "00 01 02 03 04"
+"\x00\x01\x02\x03\x04"
+```
+
 ## Building / Installation
 
 ### From Source
@@ -26,9 +33,10 @@ Requires latest master of Zig.
 ## Usage
 
 ```
-Usage: zigescape [-hs] [-o <PATH>] <INPUT>
+Usage: zigescape [-hsx] [-o <PATH>] <INPUT>
 
-<INPUT>: Either a path to a file or a Zig string literal (if using --string)
+<INPUT>: Either a path to a file, or a Zig string literal (if using --string),
+         or a series of hex bytes in string format (if using --hex).
          If <INPUT> is not specified, then stdin is used.
 
 Available options:
@@ -39,6 +47,10 @@ Available options:
 
 -s, --string           Specifies that the input is a Zig string literal.
                        Output will be the parsed string.
+
+-x, --hex              Specifies that the input is a series of hex bytes
+                       in string format (e.g. "0A B4 10").
+                       Output will be a Zig string literal.
 ```
 
 ## Examples
@@ -61,6 +73,12 @@ or, if you want to output to a file:
 zigescape path/to/file -o path/to/outfile
 ```
 
+or, if you want to convert from a series of hex bytes in string format:
+
+```
+zigescape --hex "00 01 02 03 04"
+```
+
 ### Converting *from* string literal
 
 > Note: shell escaping of arguments can mess with the string literal before it gets parsed, so it's best to use single quotes to bypass shell escaping. 
@@ -73,6 +91,12 @@ The double quotes are optional, `zigescape` will add them if they are missing:
 
 ```
 zigescape --string 'hello world\n'
+```
+
+To convert from a series of hex bytes to a string literal and then into a binary file:
+
+```
+zigescape --hex "00 01 02 03 04" | zigescape --string -o outfile.bin
 ```
 
 ### Some silly examples
