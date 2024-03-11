@@ -3,7 +3,7 @@ const clap = @import("clap");
 
 pub fn main() anyerror!void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer std.debug.assert(gpa.deinit() == false);
+    defer std.debug.assert(gpa.deinit() == .ok);
     const allocator = gpa.allocator();
 
     const params = comptime [_]clap.Param(clap.Help){
@@ -25,7 +25,7 @@ pub fn main() anyerror!void {
     };
     defer argres.deinit();
 
-    if (argres.args.help) {
+    if (argres.args.help != 0) {
         const writer = std.io.getStdErr().writer();
         try writer.writeAll("Usage: zigescape ");
         try clap.usage(writer, clap.Help, &params);
@@ -58,7 +58,7 @@ pub fn main() anyerror!void {
 
     var data_allocated = false;
     const data = data: {
-        if ((argres.args.string or argres.args.hex) and argres.positionals.len > 0) {
+        if ((argres.args.string != 0 or argres.args.hex != 0) and argres.positionals.len > 0) {
             break :data argres.positionals[0];
         }
         const infile = infile: {
@@ -74,7 +74,7 @@ pub fn main() anyerror!void {
     };
     defer if (data_allocated) allocator.free(data);
 
-    if (argres.args.string) {
+    if (argres.args.string != 0) {
         var line = data;
         if (std.mem.indexOfAny(u8, line, "\r\n")) |line_end| {
             line = line[0..line_end];
@@ -84,7 +84,7 @@ pub fn main() anyerror!void {
         if (line.len < 2 or line[0] != '"' or line[line.len - 1] != '"') {
             var buf = try allocator.alloc(u8, line.len + 2);
             buf[0] = '"';
-            std.mem.copy(u8, buf[1..], line);
+            @memcpy(buf[1..][0..line.len], line);
             buf[buf.len - 1] = '"';
 
             line = buf;
@@ -98,7 +98,7 @@ pub fn main() anyerror!void {
         try writer.writeAll(parsed);
     } else {
         var to_escape = data;
-        if (argres.args.hex) {
+        if (argres.args.hex != 0) {
             var buf = std.ArrayList(u8).init(allocator);
             errdefer buf.deinit();
             var err_loc: ErrorLoc = undefined;
@@ -111,7 +111,7 @@ pub fn main() anyerror!void {
             };
             to_escape = try buf.toOwnedSlice();
         }
-        defer if (argres.args.hex) allocator.free(to_escape);
+        defer if (argres.args.hex != 0) allocator.free(to_escape);
         try writer.print("\"{}\"\n", .{std.zig.fmtEscapes(to_escape)});
     }
 }
