@@ -32,9 +32,8 @@ $ zigescape --hex "00 01 02 03 04"
 
 Requires latest master of Zig.
 
-1. Clone this repository and its submodules (`git clone --recursive` to get submodules)
 2. `zig build`
-3. The compiled binary will be in `zig-out/bin/zigescape`
+3. The compiled binary will be in `zig-out/bin`
 4. `mv` or `ln` the binary somewhere in your `PATH`
 
 ## Usage
