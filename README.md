@@ -21,6 +21,13 @@ $ zigescape --hex "00 01 02 03 04"
 
 ## Building / Installation
 
+### Precompiled binaries
+
+1. Go to the [latest release](https://github.com/squeek502/zigescape/releases/latest)
+2. Download the relevant asset for your OS
+3. Rename to `zigescape` or `zigescape.exe` and give it executable permission (if necessary on your OS)
+4. Move the executable somewhere in your `PATH`
+
 ### From Source
 
 Requires latest master of Zig.
